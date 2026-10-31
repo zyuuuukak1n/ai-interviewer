@@ -207,14 +207,38 @@ export function setupWebSocketServer(wss: WebSocketServer) {
               };
               geminiWs.send(JSON.stringify(realtimeMsg));
             }
-          } else if (parsed.type === "user_transcript") {
-            // ユーザー発言の記録
-            if (parsed.text) {
+          } else if (parsed.type === "user_turn_complete" || parsed.type === "user_transcript") {
+            const userText = parsed.text?.trim();
+            console.log(`[Gemini Live] Received user speech for session ${sessionId}: "${userText}"`);
+
+            if (userText) {
               sessionContext.transcript.push({
                 role: "user",
-                text: parsed.text,
+                text: userText,
                 timestamp: Date.now(),
               });
+            }
+
+            // Gemini Live API へユーザー発話をターン完了として送信し、応答音声を生成させる
+            if (geminiWs.readyState === WebSocket.OPEN) {
+              const clientTurnMsg = {
+                clientContent: {
+                  turns: [
+                    {
+                      role: "user",
+                      parts: [
+                        {
+                          text: userText
+                            ? `応募者の回答: "${userText}"`
+                            : "（応募者が回答を終えました。面接官として回答内容を受け止め、適切なリアクションと深掘り質問、または次の質問を行ってください。）",
+                        },
+                      ],
+                    },
+                  ],
+                  turnComplete: true,
+                },
+              };
+              geminiWs.send(JSON.stringify(clientTurnMsg));
             }
           } else if (parsed.type === "end_interview") {
             terminateSession(sessionId);

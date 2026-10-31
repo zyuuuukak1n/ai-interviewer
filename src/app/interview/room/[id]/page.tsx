@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Mic, MicOff, PhoneOff, AlertCircle, Building2, User } from "lucide-react";
+import { Mic, MicOff, PhoneOff, AlertCircle, Building2, User, Send } from "lucide-react";
 import { AudioVisualizer } from "@/components/interview/AudioVisualizer";
 import { InterviewTimer } from "@/components/interview/InterviewTimer";
 import { LiveCaptions } from "@/components/interview/LiveCaptions";
@@ -38,6 +38,8 @@ export default function InterviewRoomPage({
   const playbackQueueRef = useRef<ArrayBuffer[]>([]);
   const isPlayingRef = useRef(false);
   const recognitionRef = useRef<any>(null);
+  const speechTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const currentSpeechTextRef = useRef<string>("");
 
   // 1. セッション情報の読み込み
   useEffect(() => {
@@ -169,8 +171,31 @@ export default function InterviewRoomPage({
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           text += event.results[i][0].transcript;
         }
-        if (text.trim()) {
-          setLastUserText(text.trim());
+        const trimmed = text.trim();
+        if (trimmed) {
+          setLastUserText(trimmed);
+          currentSpeechTextRef.current = trimmed;
+
+          // 発話が途切れて1.5秒経過したらターン完了としてサーバーへ送信
+          if (speechTimeoutRef.current) {
+            clearTimeout(speechTimeoutRef.current);
+          }
+          speechTimeoutRef.current = setTimeout(() => {
+            if (
+              wsRef.current &&
+              wsRef.current.readyState === WebSocket.OPEN &&
+              currentSpeechTextRef.current
+            ) {
+              console.log("[Client] Sending turn complete to AI:", currentSpeechTextRef.current);
+              wsRef.current.send(
+                JSON.stringify({
+                  type: "user_turn_complete",
+                  text: currentSpeechTextRef.current,
+                })
+              );
+              currentSpeechTextRef.current = "";
+            }
+          }, 1500);
         }
       };
 
@@ -324,6 +349,10 @@ export default function InterviewRoomPage({
   };
 
   const cleanupResources = () => {
+    if (speechTimeoutRef.current) {
+      clearTimeout(speechTimeoutRef.current);
+      speechTimeoutRef.current = null;
+    }
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -343,6 +372,23 @@ export default function InterviewRoomPage({
     }
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.close();
+    }
+  };
+
+  const handleSendTurnComplete = () => {
+    if (speechTimeoutRef.current) {
+      clearTimeout(speechTimeoutRef.current);
+    }
+    const textToSend = currentSpeechTextRef.current || lastUserText;
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && textToSend) {
+      console.log("[Client] Sending turn complete to AI:", textToSend);
+      wsRef.current.send(
+        JSON.stringify({
+          type: "user_turn_complete",
+          text: textToSend,
+        })
+      );
+      currentSpeechTextRef.current = "";
     }
   };
 
@@ -427,7 +473,7 @@ export default function InterviewRoomPage({
           lastUserText={lastUserText}
         />
 
-        <div className="flex items-center justify-center gap-4 py-4">
+        <div className="flex flex-wrap items-center justify-center gap-4 py-4">
           {/* マイクミュート */}
           <button
             onClick={() => setIsMicMuted(!isMicMuted)}
@@ -439,6 +485,17 @@ export default function InterviewRoomPage({
           >
             {isMicMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5 text-emerald-400" />}
             <span>{isMicMuted ? "マイクOFF" : "マイクON"}</span>
+          </button>
+
+          {/* 回答完了送信ボタン */}
+          <button
+            onClick={handleSendTurnComplete}
+            disabled={!lastUserText || isAiSpeaking}
+            className="flex items-center gap-2 rounded-xl bg-blue-600/90 border border-blue-500/50 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-600 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:hover:scale-100"
+            title="発話が終わったらクリックすると即座に面接官が返答します（自動でも1.5秒で送信されます）"
+          >
+            <Send className="h-4 w-4 text-blue-200" />
+            <span>回答完了（面接官へ）</span>
           </button>
 
           {/* 面接終了ボタン */}
