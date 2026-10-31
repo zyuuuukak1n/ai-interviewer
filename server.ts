@@ -17,17 +17,6 @@ app.prepare().then(() => {
   const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url || "", true);
-      const { pathname } = parsedUrl;
-
-      // サブディレクトリのルートアクセスで末尾スラッシュがない場合 (/tools/ai-interviewer)、スラッシュ付き (/tools/ai-interviewer/) に正規化リダイレクト
-      if (basePath && (pathname === basePath || pathname === basePath.replace(/\/$/, ""))) {
-        res.writeHead(307, {
-          Location: `${basePath.replace(/\/$/, "")}/${parsedUrl.search || ""}`,
-        });
-        res.end();
-        return;
-      }
-
       await handle(req, res, parsedUrl);
     } catch (err) {
       console.error("Error occurred handling", req.url, err);

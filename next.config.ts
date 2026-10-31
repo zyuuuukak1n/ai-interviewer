@@ -11,6 +11,17 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  async redirects() {
+    if (!basePath) return [];
+    return [
+      {
+        source: "/",
+        destination: basePath,
+        basePath: false,
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
