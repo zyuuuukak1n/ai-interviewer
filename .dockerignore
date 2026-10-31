@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.gitignore
+.env
+.env*.local
+*.log
+coverage
+tests
+DEPLOYMENT_GUIDE_LOCAL.md
+SESSION_HISTORY.md

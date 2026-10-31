@@ -1,0 +1,154 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ------------------------------------------------------
+// ユーザー・認証モデル (Better Auth 互換 + Passkey)
+// ------------------------------------------------------
+model User {
+  id            String             @id @default(cuid())
+  name          String
+  email         String             @unique
+  emailVerified Boolean            @default(false)
+  image         String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  sessions      Session[]
+  accounts      Account[]
+  passkeys      Passkey[]
+  interviews    InterviewSession[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  idToken               String?
+  password              String?   // Email/Password 認証用ハッシュ (Argon2 / bcrypt)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verifications")
+}
+
+model Passkey {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String?
+  publicKey    String   // Base64エンコード公開鍵
+  credentialID String   @unique
+  counter      Int      @default(0)
+  deviceType   String?
+  backedUp     Boolean  @default(false)
+  transports   String?
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("passkeys")
+}
+
+// ------------------------------------------------------
+// 面接セッション & フィードバックモデル
+// ------------------------------------------------------
+model InterviewSession {
+  id                 String           @id @default(cuid())
+  userId             String?          // ログイン時のみ紐付け (未ログイン時はnull)
+  guestToken         String?          // ゲスト識別用ハッシュ
+  companyName        String
+  targetUrl          String?
+  targetRole         String           // 応募職種 (例: 総合職, ソフトウェアエンジニア)
+  interviewPhase     String           @default("FIRST_HR") // FIRST_HR, SECOND_MANAGER, FINAL_EXECUTIVE
+  jobDescription     String?          // 求人票テキスト
+  studentProfile     String?          // 自己PR・ガクチカ
+  
+  // 企業解析 & 面接官ペルソナ情報 (JSON)
+  companyAnalysis    String?          // スクレイピング要約・企業カルチャー・課題
+  personaInstruction String?          // Gemini Live API用のSystem Instruction
+  
+  // 面接ログ
+  transcript         String?          // 発話履歴 JSON [{ role: "interviewer"|"user", text: string, timestamp: number }]
+  durationSeconds    Int              @default(0)
+  status             String           @default("SETUP") // SETUP, IN_PROGRESS, COMPLETED, ABORTED
+  
+  feedbackReport     FeedbackReport?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  user               User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([guestToken])
+  @@map("interview_sessions")
+}
+
+model FeedbackReport {
+  id                 String           @id @default(cuid())
+  interviewSessionId String           @unique
+  overallGrade       String           // S, A, B, C
+  
+  // レーダーチャート用 5軸スコア (0〜100)
+  scoreLogical       Int              // 論理的思考力
+  scoreCompanyFit    Int              // 企業理解度・志望度
+  scoreInitiative    Int              // 主体性・再現性
+  scoreCommunication Int              // コミュニケーション・結論ファースト
+  scoreCultureFit    Int              // カルチャーフィット度
+  
+  overallSummary     String           // 総合講評
+  detailedReviews    String           // JSON: 回答別の改善提案
+  followUpResistance String           // JSON: 深掘り耐性レビュー
+  
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  interviewSession   InterviewSession @relation(fields: [interviewSessionId], references: [id], onDelete: Cascade)
+
+  @@map("feedback_reports")
+}
