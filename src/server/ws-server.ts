@@ -49,8 +49,11 @@ export function setupWebSocketServer(wss: WebSocketServer) {
         return;
       }
 
+      console.log(`[WS Server] Client connected for sessionId: ${sessionId}, guestToken: ${guestToken || "none"}`);
+
       // 既存セッションがあればクリーンアップ
       if (activeSessions.has(sessionId)) {
+        console.log(`[WS Server] Cleaning up previous session for ${sessionId}`);
         const old = activeSessions.get(sessionId);
         old?.clientWs?.close();
         old?.geminiWs?.close();
@@ -58,13 +61,15 @@ export function setupWebSocketServer(wss: WebSocketServer) {
       }
 
       const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        ws.send(JSON.stringify({ type: "error", message: "GEMINI_API_KEY is not configured on server" }));
-        ws.close(1011, "API Key missing");
+      if (!apiKey || apiKey.includes("DummyKey")) {
+        console.error(`[WS Server Error] GEMINI_API_KEY is missing or invalid: ${apiKey ? "DummyKey detected" : "undefined"}`);
+        ws.send(JSON.stringify({ type: "error", message: "サーバー側の GEMINI_API_KEY が未設定または無効です。.env の設定をご確認ください。" }));
+        ws.close(1011, "API Key missing or invalid");
         return;
       }
 
       const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+      console.log(`[WS Server] Connecting to Gemini Live API...`);
       const geminiWs = new WebSocket(geminiUrl);
 
       const sessionContext: ProxySessionContext = {
@@ -139,14 +144,23 @@ export function setupWebSocketServer(wss: WebSocketServer) {
       });
 
       geminiWs.on("error", (err) => {
-        console.error(`[Gemini Live] Error for session ${sessionId}:`, err);
+        console.error(`[Gemini Live Error] Session ${sessionId}:`, err);
         if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: "error", message: `Gemini API Error: ${err.message}` }));
+          ws.send(JSON.stringify({ type: "error", message: `Gemini API 接続エラー: ${err.message}` }));
         }
       });
 
       geminiWs.on("close", (code, reason) => {
-        console.log(`[Gemini Live] Closed for session ${sessionId}: code=${code}, reason=${reason}`);
+        const reasonStr = reason?.toString() || "";
+        console.warn(`[Gemini Live WS Closed] Session: ${sessionId}, Code: ${code}, Reason: ${reasonStr}`);
+        if (ws.readyState === WebSocket.OPEN && code !== 1000) {
+          ws.send(
+            JSON.stringify({
+              type: "error",
+              message: `Gemini Live API 切断 (Code: ${code}, 理由: ${reasonStr || "不明"})。APIキーの権限・有効性をご確認ください。`,
+            })
+          );
+        }
         terminateSession(sessionId);
       });
 

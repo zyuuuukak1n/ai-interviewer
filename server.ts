@@ -35,16 +35,21 @@ app.prepare().then(() => {
 
   server.on("upgrade", (req, socket, head) => {
     const { pathname } = parse(req.url || "", true);
+    console.log(`[WS UPGRADE REQUEST] pathname: ${pathname}, url: ${req.url}`);
 
     // /api/live-interview またはサブディレクトリ付き /tools/ai-interviewer/api/live-interview を許容
     if (
       pathname === "/api/live-interview" ||
-      pathname === "/tools/ai-interviewer/api/live-interview"
+      pathname === "/tools/ai-interviewer/api/live-interview" ||
+      pathname?.startsWith("/tools/ai-interviewer/api/live-interview") ||
+      pathname?.startsWith("/api/live-interview")
     ) {
       wss.handleUpgrade(req, socket, head, (ws) => {
+        console.log(`[WS UPGRADE SUCCESS] Handshake complete for: ${req.url}`);
         wss.emit("connection", ws, req);
       });
     } else {
+      console.warn(`[WS UPGRADE REJECTED] Unknown pathname: ${pathname}`);
       socket.destroy();
     }
   });

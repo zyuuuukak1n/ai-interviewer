@@ -103,6 +103,7 @@ export default function InterviewRoomPage({
             } else if (data.type === "session_ended") {
               handleInterviewComplete();
             } else if (data.type === "error") {
+              console.error("[WS Server Error Message]:", data.message);
               setError(data.message);
             }
           } catch (err) {
@@ -112,11 +113,19 @@ export default function InterviewRoomPage({
 
         ws.onerror = (e) => {
           console.error("WebSocket error:", e);
-          setError("リアルタイム面接サーバーとの接続に失敗しました。");
         };
 
-        ws.onclose = () => {
+        ws.onclose = (event) => {
           setIsConnected(false);
+          console.warn(`[Client WS Closed] code: ${event.code}, reason: ${event.reason}`);
+          if (event.code !== 1000 && event.code !== 1005) {
+            setError((prev) =>
+              prev ||
+              `リアルタイム面接サーバーとの接続に失敗しました (Code: ${event.code}${
+                event.reason ? `, 理由: ${event.reason}` : ""
+              })。`
+            );
+          }
         };
       } catch (err: any) {
         console.error("Init Error:", err);

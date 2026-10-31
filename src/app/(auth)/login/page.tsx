@@ -182,6 +182,9 @@ export default function LoginPage() {
             )}
             <span>{googleLoading ? "Google認証へ接続中..." : "Googleでログイン"}</span>
           </button>
+          <p className="mt-1 text-center text-[11px] text-slate-500">
+            ※ Googleログインのご利用にはサーバー側OAuth設定（GOOGLE_CLIENT_ID等）が必要です。未設定時はメールまたはパスキーをご利用ください。
+          </p>
         </div>
 
         <div className="mt-6 text-center text-xs text-slate-400">

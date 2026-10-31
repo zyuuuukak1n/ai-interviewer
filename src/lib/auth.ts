@@ -7,6 +7,14 @@ export const auth = betterAuth({
     provider: "sqlite",
   }),
   baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3080/tools/ai-interviewer",
+  basePath: "/api/auth",
+  trustedOrigins: [
+    "https://zyuuuukak1n.dev",
+    "http://localhost:3080",
+    "http://localhost:3000",
+    "http://127.0.0.1:3080",
+    "http://127.0.0.1:3000",
+  ],
   secret: process.env.BETTER_AUTH_SECRET || "fallback_secret_at_least_32_characters_long",
   emailAndPassword: {
     enabled: true,
