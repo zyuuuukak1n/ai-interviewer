@@ -33,3 +33,4 @@ export interface StructuredFeedbackData {
     items: FollowUpReviewItem[];
   };
 }
+

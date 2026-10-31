@@ -277,3 +277,4 @@ async function callGeminiFlashStructured<T>(prompt: string, schema: any): Promis
 
   return JSON.parse(rawText) as T;
 }
+

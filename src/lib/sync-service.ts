@@ -40,3 +40,4 @@ export async function syncLocalInterviewsToServer(): Promise<{ syncedCount: numb
     return { syncedCount: 0 };
   }
 }
+

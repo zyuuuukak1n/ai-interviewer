@@ -34,3 +34,4 @@ export class AppIndexedDb extends Dexie {
 }
 
 export const localDb = new AppIndexedDb();
+

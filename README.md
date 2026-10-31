@@ -103,3 +103,4 @@ docker compose up -d --build
 ## ライセンス
 
 [MIT License](LICENSE) © 2026 じゅーかきん
+

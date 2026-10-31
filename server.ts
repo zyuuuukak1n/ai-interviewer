@@ -48,3 +48,4 @@ app.prepare().then(() => {
     console.log(`> Subdirectory Base Path: ${process.env.BASE_PATH || "/tools/ai-interviewer"}`);
   });
 });
+

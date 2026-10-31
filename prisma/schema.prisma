@@ -152,3 +152,4 @@ model FeedbackReport {
 
   @@map("feedback_reports")
 }
+

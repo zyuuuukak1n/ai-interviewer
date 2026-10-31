@@ -108,3 +108,4 @@ export function AudioVisualizer({ isAiSpeaking, isUserSpeaking, statusText }: Au
     </div>
   );
 }
+

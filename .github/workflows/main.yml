@@ -37,3 +37,4 @@ jobs:
           BETTER_AUTH_SECRET: "dummy_secret_for_ci_build_must_be_32_characters"
           BETTER_AUTH_URL: "http://localhost:3080/tools/ai-interviewer"
           BASE_PATH: "/tools/ai-interviewer"
+

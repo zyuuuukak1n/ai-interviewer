@@ -31,6 +31,12 @@ PORT="3000"
 NODE_ENV="production"
 ```
 
+### Credential Acquisition Details:
+1. **`GEMINI_API_KEY`**: Obtain from [Google AI Studio](https://aistudio.google.com/) by clicking "Get API key" -> "Create API key".
+2. **`BETTER_AUTH_SECRET`**: Generate using `openssl rand -base64 32` on your terminal.
+3. **`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`** (Optional): Create in [Google Cloud Console](https://console.cloud.google.com/) -> Credentials -> OAuth Client ID (Web Application) with redirect URI: `https://<domain>/tools/ai-interviewer/api/auth/callback/google`.
+4. **`NEXT_PUBLIC_RP_ID`**: Must match your domain host without scheme/port (e.g. `yourdomain.com`).
+
 ---
 
 ## 3. Docker Compose Deployment
@@ -86,3 +92,4 @@ location /tools/ai-interviewer/ {
 curl -I http://127.0.0.1:3080/tools/ai-interviewer/
 ```
 Verify that HTTP 200 is returned.
+

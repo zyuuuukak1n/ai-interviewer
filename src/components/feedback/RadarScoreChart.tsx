@@ -136,3 +136,4 @@ export function RadarScoreChart({ scores }: RadarScoreChartProps) {
 function indexOrAngle(i: number) {
   return i;
 }
+

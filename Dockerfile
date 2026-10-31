@@ -47,3 +47,4 @@ USER node
 EXPOSE 3000
 
 CMD ["npx", "tsx", "server.ts"]
+

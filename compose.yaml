@@ -22,3 +22,4 @@ services:
       - NEXT_PUBLIC_RP_ID=zyuuuukak1n.dev
     volumes:
       - ./data:/app/prisma
+

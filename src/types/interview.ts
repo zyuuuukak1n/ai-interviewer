@@ -23,3 +23,4 @@ export interface ChatMessage {
   text: string;
   timestamp: number;
 }
+
