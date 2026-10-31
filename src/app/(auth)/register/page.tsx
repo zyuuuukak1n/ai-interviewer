@@ -34,11 +34,11 @@ export default function RegisterPage() {
       });
 
       if (res?.error) {
-        const msg = res.error.message || "";
+        const msg = res.error.message || `ステータス: ${res.error.status || "不明"}`;
         if (msg.includes("already exists") || msg.includes("Unique constraint")) {
           throw new Error("このメールアドレスは既に登録されています。ログイン画面からログインしてください。");
         }
-        throw new Error(msg || "アカウント作成に失敗しました。");
+        throw new Error(msg);
       }
 
       await syncLocalInterviewsToServer();

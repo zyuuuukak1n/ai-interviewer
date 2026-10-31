@@ -54,10 +54,8 @@ export default function LoginPage() {
       });
 
       if (res?.error) {
-        throw new Error(
-          res.error.message ||
-            "Googleログインの連携に失敗しました。サーバー環境変数 (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET) の設定状況をご確認ください。"
-        );
+        const errorDetail = res.error.message || `ステータス: ${res.error.status || "不明"}`;
+        throw new Error(`Googleログインエラー: ${errorDetail}`);
       }
     } catch (err: any) {
       console.error("Google sign-in error:", err);
