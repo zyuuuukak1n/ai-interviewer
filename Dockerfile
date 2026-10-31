@@ -33,14 +33,15 @@ RUN apk add --no-cache openssl
 # 非rootユーザーの権限設定
 RUN chown -R node:node /app
 
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/server.ts ./server.ts
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --chown=node:node --from=builder /app/next.config.ts ./next.config.ts
+COPY --chown=node:node --from=builder /app/public ./public
+COPY --chown=node:node --from=builder /app/.next ./.next
+COPY --chown=node:node --from=builder /app/node_modules ./node_modules
+COPY --chown=node:node --from=builder /app/package.json ./package.json
+COPY --chown=node:node --from=builder /app/prisma ./prisma
+COPY --chown=node:node --from=builder /app/server.ts ./server.ts
+COPY --chown=node:node --from=builder /app/src ./src
+COPY --chown=node:node --from=builder /app/tsconfig.json ./tsconfig.json
 
 USER node
 

@@ -17,6 +17,10 @@ app.prepare().then(() => {
   const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url || "", true);
+      // アクセスログ出力 (ヘルスチェックやAPI、ページ遷移の追跡用)
+      if (req.url && !req.url.includes("/_next/static/")) {
+        console.log(`[HTTP ${req.method}] ${req.url}`);
+      }
       await handle(req, res, parsedUrl);
     } catch (err) {
       console.error("Error occurred handling", req.url, err);
