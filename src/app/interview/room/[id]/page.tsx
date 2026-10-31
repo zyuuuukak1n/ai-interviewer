@@ -37,6 +37,7 @@ export default function InterviewRoomPage({
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const playbackQueueRef = useRef<ArrayBuffer[]>([]);
   const isPlayingRef = useRef(false);
+  const recognitionRef = useRef<any>(null);
 
   // 1. セッション情報の読み込み
   useEffect(() => {
@@ -74,11 +75,16 @@ export default function InterviewRoomPage({
         });
         micStreamRef.current = stream;
 
-        // Web Audio Context (再生用 24kHz / 入力用 16kHz)
-        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({
+        // Web Audio Context (再生用 24kHz)
+        const playbackAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({
           sampleRate: 24000,
         });
-        audioContextRef.current = audioCtx;
+        audioContextRef.current = playbackAudioCtx;
+
+        // 入力用 AudioContext (16kHz PCM)
+        const inputAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({
+          sampleRate: 16000,
+        });
 
         // WebSocket 接続
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -92,7 +98,8 @@ export default function InterviewRoomPage({
 
         ws.onopen = () => {
           setIsConnected(true);
-          startMicStreaming(stream, audioCtx, ws);
+          startMicStreaming(stream, inputAudioCtx, ws);
+          startSpeechRecognition();
         };
 
         ws.onmessage = async (event) => {
@@ -144,6 +151,52 @@ export default function InterviewRoomPage({
       cleanupResources();
     };
   }, [sessionId, guestToken]);
+
+  // クライアント側 Web Speech API によるユーザー発話のリアルタイム字幕化
+  const startSpeechRecognition = () => {
+    try {
+      const SpeechRecognition =
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (!SpeechRecognition) return;
+
+      const recognition = new SpeechRecognition();
+      recognition.lang = "ja-JP";
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onresult = (event: any) => {
+        let text = "";
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          text += event.results[i][0].transcript;
+        }
+        if (text.trim()) {
+          setLastUserText(text.trim());
+        }
+      };
+
+      recognition.onerror = (e: any) => {
+        if (e.error !== "no-speech") {
+          console.warn("Speech recognition warning:", e.error);
+        }
+      };
+
+      // 途中で切断されても面接中は再開
+      recognition.onend = () => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && !isFinishing) {
+          try {
+            recognition.start();
+          } catch {
+            // ignore
+          }
+        }
+      };
+
+      recognition.start();
+      recognitionRef.current = recognition;
+    } catch (err) {
+      console.warn("SpeechRecognition init error:", err);
+    }
+  };
 
   // マイク音声のキャプチャ & PCM 16kHz 送信
   const startMicStreaming = (
@@ -271,6 +324,14 @@ export default function InterviewRoomPage({
   };
 
   const cleanupResources = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // ignore
+      }
+      recognitionRef.current = null;
+    }
     if (micStreamRef.current) {
       micStreamRef.current.getTracks().forEach((track) => track.stop());
     }

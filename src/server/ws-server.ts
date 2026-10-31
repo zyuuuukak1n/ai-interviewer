@@ -115,6 +115,29 @@ export function setupWebSocketServer(wss: WebSocketServer) {
 
         geminiWs.send(JSON.stringify(setupMessage));
         ws.send(JSON.stringify({ type: "ready", message: "Gemini Live Connected" }));
+
+        // AI面接官の最初の発話（オープニングリマーク）を自発的にスタートさせるトリガー
+        setTimeout(() => {
+          if (geminiWs.readyState === WebSocket.OPEN) {
+            console.log(`[Gemini Live] Sending initial opening trigger for session: ${sessionId}`);
+            const initialPrompt = {
+              clientContent: {
+                turns: [
+                  {
+                    role: "user",
+                    parts: [
+                      {
+                        text: "面接を開始します。応募者が面接室に入室しました。面接官として自己紹介と挨拶を行い、リラックスさせつつ最初の質問（簡単な自己紹介や志望動機など）を口頭で発話してください。",
+                      },
+                    ],
+                  },
+                ],
+                turnComplete: true,
+              },
+            };
+            geminiWs.send(JSON.stringify(initialPrompt));
+          }
+        }, 500);
       });
 
       geminiWs.on("message", (data: any) => {
