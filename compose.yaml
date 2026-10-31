@@ -12,7 +12,7 @@ services:
       - PORT=3000
       - HOSTNAME=0.0.0.0
       - BASE_PATH=/tools/ai-interviewer
-      - DATABASE_URL=file:/app/prisma/prod.db
+      - DATABASE_URL=${DATABASE_URL:-file:/app/data/prod.db}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
       - BETTER_AUTH_URL=https://zyuuuukak1n.dev/tools/ai-interviewer
@@ -21,5 +21,5 @@ services:
       - NEXT_PUBLIC_RP_NAME=AI Interviewer
       - NEXT_PUBLIC_RP_ID=zyuuuukak1n.dev
     volumes:
-      - ./data:/app/prisma
+      - ./data:/app/data
 

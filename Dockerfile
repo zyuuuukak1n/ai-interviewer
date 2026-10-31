@@ -31,7 +31,7 @@ ENV BASE_PATH=/tools/ai-interviewer
 RUN apk add --no-cache openssl
 
 # 非rootユーザーの権限設定
-RUN chown -R node:node /app
+RUN mkdir -p /app/data && chown -R node:node /app
 
 COPY --chown=node:node --from=builder /app/next.config.ts ./next.config.ts
 COPY --chown=node:node --from=builder /app/public ./public

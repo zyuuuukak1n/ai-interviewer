@@ -70,7 +70,10 @@ export default function RegisterPage() {
 
         <form onSubmit={handleRegister} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">お名前</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-medium text-slate-300">お名前（ニックネーム可）</label>
+              <span className="text-[11px] text-blue-400">匿名・仮名OK</span>
+            </div>
             <div className="relative">
               <User className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
               <input
@@ -78,10 +81,13 @@ export default function RegisterPage() {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="就活 太郎"
+                placeholder="就活太郎 / ニックネーム"
                 className="w-full rounded-xl border border-slate-700 bg-slate-800/80 py-2 pl-9 pr-3 text-sm text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
+            <p className="mt-1 text-[11px] text-slate-400 leading-normal">
+              ※ 個人情報保護のため本名を入力する必要はありません。AI面接官からの呼びかけ用の名前として自由にご設定ください。
+            </p>
           </div>
 
           <div>
