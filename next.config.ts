@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   basePath: basePath === "" ? undefined : basePath,
   assetPrefix: basePath === "" ? undefined : basePath,
   reactStrictMode: true,
+  skipTrailingSlashRedirect: true,
   env: {
     NEXT_PUBLIC_BASE_PATH: basePath,
   },

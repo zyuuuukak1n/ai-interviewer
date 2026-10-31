@@ -61,9 +61,13 @@ RewriteEngine On
 RewriteCond %{HTTP:Upgrade} =websocket [NC]
 RewriteRule ^/tools/ai-interviewer/api/live-interview(.*) ws://127.0.0.1:3080/tools/ai-interviewer/api/live-interview$1 [P,L]
 
-<Location /tools/ai-interviewer/>
-    ProxyPass http://127.0.0.1:3080/tools/ai-interviewer/
-    ProxyPassReverse http://127.0.0.1:3080/tools/ai-interviewer/
+ProxyPass /tools/ai-interviewer http://127.0.0.1:3080/tools/ai-interviewer
+ProxyPassReverse /tools/ai-interviewer http://127.0.0.1:3080/tools/ai-interviewer
+
+<Location /tools/ai-interviewer>
+    ProxyPreserveHost On
+    RequestHeader set X-Forwarded-Proto "https"
+    RequestHeader set X-Forwarded-Port "443"
 </Location>
 ```
 
