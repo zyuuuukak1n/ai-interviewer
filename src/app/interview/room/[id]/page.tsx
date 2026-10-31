@@ -28,6 +28,8 @@ export default function InterviewRoomPage({
   const [showCaptions, setShowCaptions] = useState(false); // 本番緊張感維持のためデフォルトOFF
   const [lastInterviewerText, setLastInterviewerText] = useState("");
   const [lastUserText, setLastUserText] = useState("");
+  const [isThinkingOrPause, setIsThinkingOrPause] = useState(false);
+  const [isWaitingAiResponse, setIsWaitingAiResponse] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFinishing, setIsFinishing] = useState(false);
 
@@ -39,7 +41,9 @@ export default function InterviewRoomPage({
   const isPlayingRef = useRef(false);
   const recognitionRef = useRef<any>(null);
   const speechTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const currentSpeechTextRef = useRef<string>("");
+  const accumulatedTranscriptRef = useRef<string>("");
+  const interimTranscriptRef = useRef<string>("");
+  const isNewModelTurnRef = useRef<boolean>(true);
 
   // 1. セッション情報の読み込み
   useEffect(() => {
@@ -154,6 +158,39 @@ export default function InterviewRoomPage({
     };
   }, [sessionId, guestToken]);
 
+  // 回答の送信実行 (手動ボタンまたは3.5秒無音検知)
+  const executeSendTurn = (manual = false) => {
+    if (speechTimeoutRef.current) {
+      clearTimeout(speechTimeoutRef.current);
+      speechTimeoutRef.current = null;
+    }
+    setIsThinkingOrPause(false);
+
+    const textToSend =
+      (accumulatedTranscriptRef.current + " " + interimTranscriptRef.current).trim() || lastUserText;
+
+    if (!textToSend || isAiSpeaking) {
+      return;
+    }
+
+    console.log(`[Client] Sending turn complete (${manual ? "Manual" : "Auto 3.5s pause"}):`, textToSend);
+    setIsWaitingAiResponse(true);
+
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: "user_turn_complete",
+          text: textToSend,
+        })
+      );
+    }
+
+    // 送信後は次ターンのためにバッファをリセット
+    accumulatedTranscriptRef.current = "";
+    interimTranscriptRef.current = "";
+    isNewModelTurnRef.current = true;
+  };
+
   // クライアント側 Web Speech API によるユーザー発話のリアルタイム字幕化
   const startSpeechRecognition = () => {
     try {
@@ -167,35 +204,35 @@ export default function InterviewRoomPage({
       recognition.interimResults = true;
 
       recognition.onresult = (event: any) => {
-        let text = "";
+        let interim = "";
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-          text += event.results[i][0].transcript;
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            accumulatedTranscriptRef.current +=
+              (accumulatedTranscriptRef.current ? " " : "") + transcript.trim();
+          } else {
+            interim += transcript;
+          }
         }
-        const trimmed = text.trim();
-        if (trimmed) {
-          setLastUserText(trimmed);
-          currentSpeechTextRef.current = trimmed;
+        interimTranscriptRef.current = interim;
+        const fullText = (accumulatedTranscriptRef.current + " " + interim).trim();
 
-          // 発話が途切れて1.5秒経過したらターン完了としてサーバーへ送信
+        if (fullText) {
+          setLastUserText(fullText);
+
+          // ユーザーが発声中：思考待機タイマーをクリアしてリセット！
+          setIsThinkingOrPause(false);
           if (speechTimeoutRef.current) {
             clearTimeout(speechTimeoutRef.current);
+            speechTimeoutRef.current = null;
           }
-          speechTimeoutRef.current = setTimeout(() => {
-            if (
-              wsRef.current &&
-              wsRef.current.readyState === WebSocket.OPEN &&
-              currentSpeechTextRef.current
-            ) {
-              console.log("[Client] Sending turn complete to AI:", currentSpeechTextRef.current);
-              wsRef.current.send(
-                JSON.stringify({
-                  type: "user_turn_complete",
-                  text: currentSpeechTextRef.current,
-                })
-              );
-              currentSpeechTextRef.current = "";
-            }
-          }, 1500);
+
+          // AI発話中・回答生成中でない場合のみ、3.5秒の無音タイマーをセット
+          if (!isAiSpeaking && !isWaitingAiResponse && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            speechTimeoutRef.current = setTimeout(() => {
+              executeSendTurn(false);
+            }, 3500);
+          }
         }
       };
 
@@ -246,7 +283,28 @@ export default function InterviewRoomPage({
           sum += inputData[i] * inputData[i];
         }
         const rms = Math.sqrt(sum / inputData.length);
-        setIsUserSpeaking(rms > 0.02);
+        const isSpeakingNow = rms > 0.02;
+        setIsUserSpeaking(isSpeakingNow);
+
+        if (isSpeakingNow) {
+          // 発声中ならタイマーを即座にリセット（言葉に詰まっても再び声を出せば分断されない）
+          if (speechTimeoutRef.current) {
+            clearTimeout(speechTimeoutRef.current);
+            speechTimeoutRef.current = null;
+          }
+          setIsThinkingOrPause(false);
+        } else {
+          // 話し終わって沈黙中かつ未送信テキストがある場合
+          const hasUnsentText = Boolean(accumulatedTranscriptRef.current || interimTranscriptRef.current);
+          if (hasUnsentText && !isAiSpeaking && !isWaitingAiResponse) {
+            setIsThinkingOrPause(true);
+            if (!speechTimeoutRef.current && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              speechTimeoutRef.current = setTimeout(() => {
+                executeSendTurn(false);
+              }, 3500);
+            }
+          }
+        }
 
         // Float32 -> Int16 PCM 変換
         const pcm16 = new Int16Array(inputData.length);
@@ -281,10 +339,18 @@ export default function InterviewRoomPage({
   // Gemini からの応答メッセージ処理
   const handleGeminiMessage = (payload: any) => {
     if (payload.serverContent?.modelTurn?.parts) {
+      setIsWaitingAiResponse(false);
+      setIsThinkingOrPause(false);
+
       for (const part of payload.serverContent.modelTurn.parts) {
         // テキスト文字起こし
         if (part.text) {
-          setLastInterviewerText((prev) => prev + " " + part.text);
+          if (isNewModelTurnRef.current) {
+            setLastInterviewerText(part.text);
+            isNewModelTurnRef.current = false;
+          } else {
+            setLastInterviewerText((prev) => prev + " " + part.text);
+          }
         }
 
         // PCM 24kHz 音声再生
@@ -376,20 +442,7 @@ export default function InterviewRoomPage({
   };
 
   const handleSendTurnComplete = () => {
-    if (speechTimeoutRef.current) {
-      clearTimeout(speechTimeoutRef.current);
-    }
-    const textToSend = currentSpeechTextRef.current || lastUserText;
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && textToSend) {
-      console.log("[Client] Sending turn complete to AI:", textToSend);
-      wsRef.current.send(
-        JSON.stringify({
-          type: "user_turn_complete",
-          text: textToSend,
-        })
-      );
-      currentSpeechTextRef.current = "";
-    }
+    executeSendTurn(true);
   };
 
   const handleFinishInterview = () => {
@@ -455,8 +508,12 @@ export default function InterviewRoomPage({
               statusText={
                 isAiSpeaking
                   ? "面接官が質問中..."
+                  : isWaitingAiResponse
+                  ? "面接官が回答を検討中..."
                   : isUserSpeaking
                   ? "あなたが回答中..."
+                  : isThinkingOrPause
+                  ? "思考中（間を取って話せます）"
                   : "面接官が傾聴しています"
               }
             />
@@ -465,7 +522,19 @@ export default function InterviewRoomPage({
       </div>
 
       {/* 下部: 字幕 & コントロールバー */}
-      <div className="space-y-6">
+      <div className="space-y-4">
+        {/* 思考中・AI回答生成中ステータスバナー */}
+        {isThinkingOrPause && !isAiSpeaking && !isWaitingAiResponse && (
+          <div className="flex items-center justify-center gap-2 text-xs font-medium text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-full px-4 py-1.5 w-fit mx-auto animate-pulse">
+            <span>思考の間（ゆっくり話して大丈夫です。話し終えたら「回答完了」を押すか、約3.5秒で自動送信されます）</span>
+          </div>
+        )}
+        {isWaitingAiResponse && (
+          <div className="flex items-center justify-center gap-2 text-xs font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-full px-4 py-1.5 w-fit mx-auto animate-pulse">
+            <span>面接官が回答を受け止め、返答を考えています...</span>
+          </div>
+        )}
+
         <LiveCaptions
           showCaptions={showCaptions}
           onToggleCaptions={() => setShowCaptions(!showCaptions)}
@@ -473,7 +542,7 @@ export default function InterviewRoomPage({
           lastUserText={lastUserText}
         />
 
-        <div className="flex flex-wrap items-center justify-center gap-4 py-4">
+        <div className="flex flex-wrap items-center justify-center gap-4 py-2">
           {/* マイクミュート */}
           <button
             onClick={() => setIsMicMuted(!isMicMuted)}
@@ -490,9 +559,9 @@ export default function InterviewRoomPage({
           {/* 回答完了送信ボタン */}
           <button
             onClick={handleSendTurnComplete}
-            disabled={!lastUserText || isAiSpeaking}
+            disabled={!lastUserText || isAiSpeaking || isWaitingAiResponse}
             className="flex items-center gap-2 rounded-xl bg-blue-600/90 border border-blue-500/50 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-600 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-40 disabled:hover:scale-100"
-            title="発話が終わったらクリックすると即座に面接官が返答します（自動でも1.5秒で送信されます）"
+            title="発話が終わったらクリックすると即座に面接官が返答します（自動でも約3.5秒の無音で送信されます）"
           >
             <Send className="h-4 w-4 text-blue-200" />
             <span>回答完了（面接官へ）</span>
