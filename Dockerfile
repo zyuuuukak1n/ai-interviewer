@@ -42,10 +42,12 @@ COPY --chown=node:node --from=builder /app/prisma ./prisma
 COPY --chown=node:node --from=builder /app/server.ts ./server.ts
 COPY --chown=node:node --from=builder /app/src ./src
 COPY --chown=node:node --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --chown=node:node docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh
 
 USER node
 
 EXPOSE 3000
 
-CMD ["npx", "tsx", "server.ts"]
+CMD ["./docker-entrypoint.sh"]
 

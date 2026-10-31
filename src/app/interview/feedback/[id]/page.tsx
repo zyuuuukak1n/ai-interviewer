@@ -36,7 +36,8 @@ export default function InterviewFeedbackPage({
         }
 
         // サーバーにフィードバック生成を要求
-        const res = await fetch("/api/feedback", {
+        const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+        const res = await fetch(`${basePath}/api/feedback`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sessionId, guestToken }),

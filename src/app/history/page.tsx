@@ -28,7 +28,8 @@ export default function HistoryPage() {
 
       // ログイン中の場合はサーバー側の履歴も取得してマージ
       if (session?.user) {
-        const res = await fetch("/api/interviews");
+        const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+        const res = await fetch(`${basePath}/api/interviews`);
         if (res.ok) {
           const data = await res.json();
           const serverList: LocalInterviewRecord[] = data.interviews.map((item: any) => ({

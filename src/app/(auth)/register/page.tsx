@@ -19,6 +19,13 @@ export default function RegisterPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    if (password.length < 8) {
+      setError("パスワードは8文字以上で入力してください。");
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await signUp.email({
         email,
@@ -26,14 +33,19 @@ export default function RegisterPage() {
         name,
       });
 
-      if (res.error) {
-        throw new Error(res.error.message || "アカウント作成に失敗しました。");
+      if (res?.error) {
+        const msg = res.error.message || "";
+        if (msg.includes("already exists") || msg.includes("Unique constraint")) {
+          throw new Error("このメールアドレスは既に登録されています。ログイン画面からログインしてください。");
+        }
+        throw new Error(msg || "アカウント作成に失敗しました。");
       }
 
       await syncLocalInterviewsToServer();
       router.push("/history");
       router.refresh();
     } catch (err: any) {
+      console.error("Registration error:", err);
       setError(err.message || "新規登録に失敗しました。入力内容をご確認ください。");
     } finally {
       setLoading(false);
@@ -88,7 +100,10 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">パスワード (8文字以上)</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-medium text-slate-300">パスワード (8文字以上)</label>
+              <span className="text-[11px] text-slate-400">半角英数字・記号対応</span>
+            </div>
             <div className="relative">
               <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
               <input
@@ -101,6 +116,9 @@ export default function RegisterPage() {
                 className="w-full rounded-xl border border-slate-700 bg-slate-800/80 py-2 pl-9 pr-3 text-sm text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
+            <p className="mt-1.5 text-[11px] text-slate-400 leading-normal">
+              ※ 半角英字（大文字・小文字）、半角数字、および一般的な半角記号（<code className="text-blue-300">!@#$%^&*()_+-=</code> 等）を自由にご利用いただけます。
+            </p>
           </div>
 
           <button

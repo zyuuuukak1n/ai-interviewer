@@ -23,7 +23,8 @@ export default function InterviewSetupPage() {
     setIsLoading(true);
 
     try {
-      const res = await fetch("/api/analyze-company", {
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+      const res = await fetch(`${basePath}/api/analyze-company`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

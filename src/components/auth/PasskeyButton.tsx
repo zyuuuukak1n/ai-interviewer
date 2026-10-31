@@ -17,21 +17,28 @@ export function PasskeyButton({ mode, email, onSuccess }: PasskeyButtonProps) {
   const handlePasskeyAction = async () => {
     setLoading(true);
     setError(null);
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
     try {
       if (mode === "login") {
         // 1. 認証オプション取得
-        const optRes = await fetch("/api/auth/passkey", {
+        const optRes = await fetch(`${basePath}/api/auth/passkey`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "generate-authentication-options", email }),
         });
+
+        if (!optRes.ok) {
+          const errData = await optRes.json().catch(() => ({}));
+          throw new Error(errData.error || `認証オプションの取得に失敗しました (${optRes.status})`);
+        }
         const { options, challengeKey } = await optRes.json();
 
         // 2. ブラウザ生体認証実行
         const authResponse = await startAuthentication({ optionsJSON: options });
 
         // 3. サーバー検証
-        const verifyRes = await fetch("/api/auth/passkey", {
+        const verifyRes = await fetch(`${basePath}/api/auth/passkey`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -40,22 +47,30 @@ export function PasskeyButton({ mode, email, onSuccess }: PasskeyButtonProps) {
             challengeKey,
           }),
         });
-        const verifyData = await verifyRes.json();
-        if (!verifyRes.ok) throw new Error(verifyData.error || "認証に失敗しました。");
+
+        if (!verifyRes.ok) {
+          const verifyData = await verifyRes.json().catch(() => ({}));
+          throw new Error(verifyData.error || `生体認証の検証に失敗しました (${verifyRes.status})`);
+        }
 
         onSuccess?.();
       } else {
         // 登録モード
-        const optRes = await fetch("/api/auth/passkey", {
+        const optRes = await fetch(`${basePath}/api/auth/passkey`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "generate-registration-options" }),
         });
+
+        if (!optRes.ok) {
+          const errData = await optRes.json().catch(() => ({}));
+          throw new Error(errData.error || `登録オプションの取得に失敗しました (${optRes.status})`);
+        }
         const options = await optRes.json();
 
         const regResponse = await startRegistration({ optionsJSON: options });
 
-        const verifyRes = await fetch("/api/auth/passkey", {
+        const verifyRes = await fetch(`${basePath}/api/auth/passkey`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -63,8 +78,11 @@ export function PasskeyButton({ mode, email, onSuccess }: PasskeyButtonProps) {
             response: regResponse,
           }),
         });
-        const verifyData = await verifyRes.json();
-        if (!verifyRes.ok) throw new Error(verifyData.error || "登録に失敗しました。");
+
+        if (!verifyRes.ok) {
+          const verifyData = await verifyRes.json().catch(() => ({}));
+          throw new Error(verifyData.error || `パスキー登録の検証に失敗しました (${verifyRes.status})`);
+        }
 
         onSuccess?.();
       }
